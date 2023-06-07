@@ -1,0 +1,93 @@
+<%@page import="java.util.ArrayList"%>
+<%@page import="java.util.List"%>
+<%@page import="java.util.HashMap"%>
+<%@page import="java.util.Map"%>
+<%@ page pageEncoding="UTF-8"%>
+<%@ page import="web.commons.RequestUtils" %>
+<%@ page import="model.User" %>
+<%@ page import="exceptions.UserNaoAutentException"%>
+<%@ page import="web.commons.JsonUtils"%>
+<%
+	if(application.getAttribute("listaUsers")==null){
+		application.setAttribute("listaUsers", new ArrayList<User>());
+                application.setAttribute("sessionMap", new HashMap<>());                
+	}
+	List<User> listaUsersArray = (List<User>) application.getAttribute("listaUsers");	
+        Map<String, HttpSession> sessionMap = (HashMap<String, HttpSession>) application.getAttribute("sessionMap");
+	if(request.getParameter("session-submit")!=null){
+            User user = null;
+            try {
+                String login = request.getParameter("session-login");
+                String password = request.getParameter("session-pass");                
+                String resp = RequestUtils.makePutRequest(login, password);                
+                user = JsonUtils.fromJson(resp, User.class);                
+                request.getSession(true).setAttribute("user", user);                
+                listaUsersArray.add(user);
+                user.setSessionId(request.getSession().getId());
+                sessionMap.put(request.getSession().getId(),request.getSession());
+            } catch (UserNaoAutentException una) {                
+                // Armazena a mensagem de erro em um atributo de escopo de solicitação
+                request.setAttribute("err_msg", una.getMessage());
+            } catch (Exception e) {
+                request.setAttribute("err_msg", "Ocorreu um erro: " + e.getMessage());
+            }			
+	}else if(request.getParameter("session-out")!= null){
+		listaUsersArray.remove(session.getAttribute("user"));
+		request.getSession().removeAttribute("user");
+                //sessionMap.remove(request.getSession().getId());
+		response.sendRedirect(request.getRequestURI());
+	}
+	
+	User user = (User) session.getAttribute("user");
+	
+%>
+<nav class="navbar navbar-expand-lg bg-body-tertiary">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="${pageContext.request.contextPath}/index.jsp">
+    	<i class="bi bi-people-fill"></i>
+    	Livraria App</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link active" aria-current="page" href="${pageContext.request.contextPath}/index.jsp">Início</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" aria-current="page" href="${pageContext.request.contextPath}/livros.jsp">Livros</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" aria-current="page" href="${pageContext.request.contextPath}/emprestimos.jsp">Empréstimos</a>
+        </li>
+        <li class="nav-item">
+           <a class="nav-link" href="${pageContext.request.contextPath}/usuarios.jsp">Usuários</a>
+        </li>
+        <%if(user!=null && user.getRole().equals("ADMIN")){ %>
+            <li class="nav-item">
+              <a class="nav-link" href="${pageContext.request.contextPath}/sessions.jsp">Sessões</a>
+            </li>
+        <%}%>
+      </ul>
+      <%if(user!=null){ %>
+      <form class="d-flex">
+      <span class="navbar-brand m-2 h1">
+		Olá, ${user.name}
+      </span>
+        <button class="btn btn-outline-success" type="submit" name="session-out">Sair</button>
+      </form>
+      <%} %>
+    </div>
+  </div>
+</nav>
+<%if(user==null){%>
+	<div style="m-2">
+		<%@include file="login-form.jspf" %>
+	</div>
+        <!-- Exibição da mensagem de erro -->
+        <div class="error-message">
+            <%-- Recupera a mensagem de erro do atributo de escopo de solicitação --%>
+            ${requestScope.err_msg}
+        </div>
+                
+<% } %>
